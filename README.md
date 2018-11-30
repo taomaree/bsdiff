@@ -9,7 +9,10 @@ so I fork and fix Makefile.
 ## how to install
 
 + compile source on CentOS 7
+
 ```
+git clone https://github.com/taomaree/bsdiff.git
+cd bsdiff
 make
 sudo make install 
 ```
