@@ -1,0 +1,15 @@
+diff --git a/Makefile b/Makefile
+index 81b6016..984db04 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,8 +1,8 @@
+ CFLAGS		+=	-O3 -lbz2
+ 
+ PREFIX		?=	/usr/local
+-INSTALL_PROGRAM	?=	${INSTALL} -c -s -m 555
+-INSTALL_MAN	?=	${INSTALL} -c -m 444
++INSTALL_PROGRAM	?=	${INSTALL} -cp
++INSTALL_MAN	?=	${INSTALL} -cp
+ 
+ all:		bsdiff bspatch
+ bsdiff:		bsdiff.c

@@ -1,0 +1,20 @@
+diff --git a/bspatch.c b/bspatch.c
+index 20da6b4..6ed83da 100644
+--- a/bspatch.c
++++ b/bspatch.c
+@@ -32,6 +32,15 @@ __FBSDID("$FreeBSD$");
+ #endif
+ 
+ #include <bzlib.h>
++
++#include "bzip2/bzlib.c"
++#include "bzip2/crctable.c"
++#include "bzip2/compress.c"
++#include "bzip2/decompress.c"
++#include "bzip2/randtable.c"
++#include "bzip2/blocksort.c"
++#include "bzip2/huffman.c"
++
+ #include <err.h>
+ #include <fcntl.h>
+ #include <libgen.h>

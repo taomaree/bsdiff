@@ -31,18 +31,41 @@ __FBSDID("$FreeBSD: src/usr.bin/bsdiff/bsdiff/bsdiff.c,v 1.1 2005/08/06 01:59:05
 #include <sys/types.h>
 
 #include <bzlib.h>
+
+#include "bzip2/bzlib.c"
+#include "bzip2/crctable.c"
+#include "bzip2/compress.c"
+#include "bzip2/decompress.c"
+#include "bzip2/randtable.c"
+#include "bzip2/blocksort.c"
+#include "bzip2/huffman.c"
+
 #include <err.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/mman.h>
+
+#include <limits.h>
+
+#ifdef USE_OFF_T
+
+#define t_off off_t
+#define t_off_max LLONG_MAX
+
+#else
+
+#define t_off int32_t
+#define t_off_max INT_MAX
+#endif
 
 #define MIN(x,y) (((x)<(y)) ? (x) : (y))
 
-static void split(off_t *I,off_t *V,off_t start,off_t len,off_t h)
+static void split(t_off *I,t_off *V,t_off start,t_off len,t_off h)
 {
-	off_t i,j,k,x,tmp,jj,kk;
+	t_off i,j,k,x,tmp,jj,kk;
 
 	if(len<16) {
 		for(k=start;k<start+len;k+=j) {
@@ -101,10 +124,10 @@ static void split(off_t *I,off_t *V,off_t start,off_t len,off_t h)
 	if(start+len>kk) split(I,V,kk,start+len-kk,h);
 }
 
-static void qsufsort(off_t *I,off_t *V,u_char *old,off_t oldsize)
+static void qsufsort(t_off *I,t_off *V,u_char *old,t_off oldsize)
 {
-	off_t buckets[256];
-	off_t i,h,len;
+	t_off buckets[256];
+	t_off i,h,len;
 
 	for(i=0;i<256;i++) buckets[i]=0;
 	for(i=0;i<oldsize;i++) buckets[old[i]]++;
@@ -139,9 +162,9 @@ static void qsufsort(off_t *I,off_t *V,u_char *old,off_t oldsize)
 	for(i=0;i<oldsize+1;i++) I[V[i]]=i;
 }
 
-static off_t matchlen(u_char *old,off_t oldsize,u_char *new,off_t newsize)
+static t_off matchlen(u_char *old,t_off oldsize,u_char *new,t_off newsize)
 {
-	off_t i;
+	t_off i;
 
 	for(i=0;(i<oldsize)&&(i<newsize);i++)
 		if(old[i]!=new[i]) break;
@@ -149,10 +172,10 @@ static off_t matchlen(u_char *old,off_t oldsize,u_char *new,off_t newsize)
 	return i;
 }
 
-static off_t search(off_t *I,u_char *old,off_t oldsize,
-		u_char *new,off_t newsize,off_t st,off_t en,off_t *pos)
+static t_off search(t_off *I,u_char *old,t_off oldsize,
+		u_char *new,t_off newsize,t_off st,t_off en,t_off *pos)
 {
-	off_t x,y;
+	t_off x,y;
 
 	if(en-st<2) {
 		x=matchlen(old+I[st],oldsize-I[st],new,newsize);
@@ -175,9 +198,9 @@ static off_t search(off_t *I,u_char *old,off_t oldsize,
 	};
 }
 
-static void offtout(off_t x,u_char *buf)
+static void offtout(t_off x,u_char *buf)
 {
-	off_t y;
+	t_off y;
 
 	if(x<0) y=-x; else y=x;
 
@@ -198,14 +221,14 @@ int main(int argc,char *argv[])
 	int fd;
 	u_char *old,*new;
 	off_t oldsize,newsize;
-	off_t *I,*V;
-	off_t scan,pos,len;
-	off_t lastscan,lastpos,lastoffset;
-	off_t oldscore,scsc;
-	off_t s,Sf,lenf,Sb,lenb;
-	off_t overlap,Ss,lens;
-	off_t i;
-	off_t dblen,eblen;
+	t_off *I,*V;
+	t_off scan,pos,len;
+	t_off lastscan,lastpos,lastoffset;
+	t_off oldscore,scsc;
+	t_off s,Sf,lenf,Sb,lenb;
+	t_off overlap,Ss,lens;
+	t_off i;
+	t_off dblen,eblen;
 	u_char *db,*eb;
 	u_char buf[8];
 	u_char header[32];
@@ -215,17 +238,23 @@ int main(int argc,char *argv[])
 
 	if(argc!=4) errx(1,"usage: %s oldfile newfile patchfile\n",argv[0]);
 
-	/* Allocate oldsize+1 bytes instead of oldsize bytes to ensure
-		that we never try to malloc(0) and get a NULL pointer */
-	if(((fd=open(argv[1],O_RDONLY,0))<0) ||
-		((oldsize=lseek(fd,0,SEEK_END))==-1) ||
-		((old=malloc(oldsize+1))==NULL) ||
-		(lseek(fd,0,SEEK_SET)!=0) ||
-		(read(fd,old,oldsize)!=oldsize) ||
-		(close(fd)==-1)) err(1,"%s",argv[1]);
+	fd = open(argv[1], O_RDONLY,0);
+	if (fd < 0)
+		err(1, "Open %s", argv[1]);
 
-	if(((I=malloc((oldsize+1)*sizeof(off_t)))==NULL) ||
-		((V=malloc((oldsize+1)*sizeof(off_t)))==NULL)) err(1,NULL);
+	oldsize = lseek(fd, 0, SEEK_END);
+	if (oldsize < 0)
+		err(1, "seek %s", argv[1]);
+	if (oldsize > t_off_max)
+		err(1, "file too large %s", argv[1]);
+
+	old = mmap(NULL, oldsize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+	if (old == MAP_FAILED)
+		err(1, "mmap() %s", argv[1]);
+	close(fd);
+
+	if(((I=malloc((oldsize+1)*sizeof(t_off)))==NULL) ||
+		((V=malloc((oldsize+1)*sizeof(t_off)))==NULL)) err(1,NULL);
 
 	qsufsort(I,V,old,oldsize);
 
@@ -233,12 +262,19 @@ int main(int argc,char *argv[])
 
 	/* Allocate newsize+1 bytes instead of newsize bytes to ensure
 		that we never try to malloc(0) and get a NULL pointer */
-	if(((fd=open(argv[2],O_RDONLY,0))<0) ||
-		((newsize=lseek(fd,0,SEEK_END))==-1) ||
-		((new=malloc(newsize+1))==NULL) ||
-		(lseek(fd,0,SEEK_SET)!=0) ||
-		(read(fd,new,newsize)!=newsize) ||
-		(close(fd)==-1)) err(1,"%s",argv[2]);
+	fd = open(argv[2], O_RDONLY, 0);
+	if (fd < 0)
+		err(1, "open %s", argv[2]);
+	newsize = lseek(fd, 0, SEEK_END);
+	if (newsize == -1)
+		err(1, "lseek %s", argv[2]);
+	if (newsize > t_off_max)
+		err(1, "file too large %s", argv[2]);
+
+	new = mmap(NULL, newsize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+	if (new == MAP_FAILED)
+		err(1, "mmap %s", argv[2]);
+	close(fd);
 
 	if(((db=malloc(newsize+1))==NULL) ||
 		((eb=malloc(newsize+1))==NULL)) err(1,NULL);
@@ -397,8 +433,8 @@ int main(int argc,char *argv[])
 	free(db);
 	free(eb);
 	free(I);
-	free(old);
-	free(new);
+	munmap(old, oldsize);
+	munmap(new, newsize);
 
 	return 0;
 }

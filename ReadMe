@@ -1,0 +1,10 @@
+
+Bsdiff 4.3 with debian security patch and bzip2 source embeded.
+
+How to install:
+
+make 
+sudo make install
+
+
+
