@@ -1,5 +1,5 @@
 # bsdiff
-fork http://www.daemonology.net/bsdiff and fix Makefile. 
+fork http://www.daemonology.net/bsdiff and fix Makefile, apply debian security patch. 
 
 ## why this project
 The latest source code of bsdiff(http://www.daemonology.net/bsdiff/bsdiff-4.3.tar.gz) from homepage cannot compiled,
