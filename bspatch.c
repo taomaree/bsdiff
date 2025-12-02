@@ -31,8 +31,8 @@
 __FBSDID("$FreeBSD$");
 #endif
 
-#include <bzlib.h>
-
+//#include <bzlib.h>
+#include "bzip2/bzlib.h"
 #include "bzip2/bzlib.c"
 #include "bzip2/crctable.c"
 #include "bzip2/compress.c"
@@ -93,8 +93,7 @@ add_off_t(off_t a, off_t b)
 {
 	off_t result;
 
-#if __GNUC__ >= 5 || \
-    (defined(__has_builtin) && __has_builtin(__builtin_add_overflow))
+#if __GNUC__ >= 5 
 	if (__builtin_add_overflow(a, b, &result))
 		errx(1, "Corrupt patch");
 #else
