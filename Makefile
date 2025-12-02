@@ -14,4 +14,4 @@ install-bin:
 install-man:
 	${INSTALL_MAN} bsdiff.1 bspatch.1 ${PREFIX}/man/man1
 
-install: install-bin install-man
+install: install-bin 
